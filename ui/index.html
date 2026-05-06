@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>DMS Upload Automation — Spyne</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Syne:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root{
+  --bg:#0d0e11;
+  --surface:#14161b;
+  --surface2:#1c1f27;
+  --surface3:#252933;
+  --border:#2a2e3a;
+  --border2:#363c4e;
+  --accent:#4f8ef7;
+  --accent-dim:#1e3460;
+  --accent-glow:rgba(79,142,247,0.15);
+  --green:#2dd98a;
+  --green-dim:#0f3d25;
+  --amber:#f5a623;
+  --amber-dim:#3d2800;
+  --red:#f05252;
+  --red-dim:#3d1010;
+  --text:#e8eaf0;
+  --text2:#8b92a8;
+  --text3:#50566a;
+  --mono:'IBM Plex Mono',monospace;
+  --sans:'Syne',sans-serif;
+  --r:8px;
+  --r2:12px;
+}
+
+html{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;min-height:100vh}
+body{min-height:100vh;display:flex;flex-direction:column}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:99px}
+
+/* Layout */
+.shell{display:grid;grid-template-columns:280px 1fr;min-height:100vh;max-width:1200px;margin:0 auto;padding:0 1.5rem}
+
+/* Sidebar */
+.sidebar{border-right:1px solid var(--border);padding:2rem 1.5rem 2rem 0;display:flex;flex-direction:column;gap:2rem}
+.brand{display:flex;align-items:center;gap:10px}
+.brand-icon{width:34px;height:34px;background:var(--accent);border-radius:var(--r);display:flex;align-items:center;justify-content:center}
+.brand-icon svg{width:18px;height:18px;fill:white}
+.brand-name{font-size:15px;font-weight:700;letter-spacing:0.02em}
+.brand-sub{font-size:11px;color:var(--text3);font-family:var(--mono);margin-top:1px}
+
+/* Steps nav */
+.steps-nav{display:flex;flex-direction:column;gap:2px}
+.steps-nav-title{font-size:10px;font-weight:600;color:var(--text3);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px;padding-left:10px}
+.step-item{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:var(--r);cursor:default;transition:background 0.15s}
+.step-item.active{background:var(--accent-glow);border:1px solid var(--accent-dim)}
+.step-item.done{opacity:0.65}
+.step-num{width:22px;height:22px;border-radius:50%;border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:var(--text3);flex-shrink:0;font-family:var(--mono);transition:all 0.2s}
+.step-item.active .step-num{border-color:var(--accent);color:var(--accent);background:var(--accent-dim)}
+.step-item.done .step-num{border-color:var(--green);background:var(--green-dim);color:var(--green);font-size:12px}
+.step-item.waiting .step-num{border-color:var(--amber);background:var(--amber-dim);color:var(--amber)}
+.step-label{font-size:12px;color:var(--text2);line-height:1.3}
+.step-item.active .step-label{color:var(--text)}
+
+/* Stats sidebar */
+.stats-mini{display:flex;flex-direction:column;gap:8px;margin-top:auto}
+.stat-row-mini{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r)}
+.stat-lbl-mini{font-size:11px;color:var(--text3);font-family:var(--mono)}
+.stat-val-mini{font-size:18px;font-weight:700;font-family:var(--mono)}
+.stat-val-mini.green{color:var(--green)}
+.stat-val-mini.red{color:var(--red)}
+.stat-val-mini.amber{color:var(--amber)}
+
+/* Main content */
+.main{padding:2rem 0 2rem 2rem;display:flex;flex-direction:column;gap:1.25rem}
+
+/* Header */
+.main-header{display:flex;align-items:flex-start;justify-content:space-between}
+.main-title{font-size:22px;font-weight:700;letter-spacing:-0.01em}
+.main-title span{color:var(--accent)}
+.status-badge{font-family:var(--mono);font-size:11px;padding:4px 12px;border-radius:99px;border:1px solid var(--border2);color:var(--text3);display:flex;align-items:center;gap:6px;transition:all 0.3s}
+.status-badge.running{border-color:var(--accent);color:var(--accent);background:var(--accent-glow)}
+.status-badge.done{border-color:var(--green);color:var(--green);background:var(--green-dim)}
+.status-badge.error{border-color:var(--red);color:var(--red);background:var(--red-dim)}
+.status-badge.otp_wait{border-color:var(--amber);color:var(--amber);background:var(--amber-dim)}
+.status-badge.stopped{border-color:var(--border2);color:var(--text3)}
+.dot{width:6px;height:6px;border-radius:50%;background:currentColor;flex-shrink:0}
+.dot.pulse{animation:pulse 1.4s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+
+/* Cards */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);padding:1.25rem}
+.card-title{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:1rem;display:flex;align-items:center;gap:6px}
+.card-title svg{width:13px;height:13px;opacity:0.6}
+
+/* Form */
+.form-group{display:flex;flex-direction:column;gap:6px;margin-bottom:1rem}
+.form-group:last-child{margin-bottom:0}
+.form-label{font-size:11px;font-weight:600;color:var(--text3);font-family:var(--mono);text-transform:uppercase;letter-spacing:0.07em}
+.folder-row{display:flex;gap:8px}
+.folder-input{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:9px 12px;color:var(--text);font-family:var(--mono);font-size:13px;outline:none;transition:border 0.15s}
+.folder-input:focus{border-color:var(--accent)}
+.folder-input::placeholder{color:var(--text3)}
+.readonly-field{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:9px 12px;color:var(--text3);font-family:var(--mono);font-size:13px}
+.creds-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+/* Buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:9px 16px;border-radius:var(--r);border:1px solid var(--border2);background:var(--surface2);color:var(--text2);font-family:var(--sans);font-size:13px;font-weight:500;cursor:pointer;transition:all 0.15s;white-space:nowrap}
+.btn:hover{background:var(--surface3);color:var(--text);border-color:var(--border2)}
+.btn:active{transform:scale(0.98)}
+.btn:disabled{opacity:0.35;cursor:not-allowed;pointer-events:none}
+.btn-primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600;font-size:14px;padding:11px 28px}
+.btn-primary:hover{background:#6fa4fb;border-color:#6fa4fb;color:#fff}
+.btn-danger{background:var(--red-dim);border-color:var(--red);color:var(--red)}
+.btn-danger:hover{background:#5a1a1a;color:var(--red)}
+.btn-success{background:var(--green-dim);border-color:var(--green);color:var(--green)}
+.btn-success:hover{background:#1a4d35;color:var(--green)}
+.btn-amber{background:var(--amber-dim);border-color:var(--amber);color:var(--amber)}
+.btn-amber:hover{background:#5a3800;color:var(--amber)}
+
+/* OTP banner */
+.otp-banner{background:var(--amber-dim);border:1px solid var(--amber);border-radius:var(--r2);padding:1rem 1.25rem;display:none;flex-direction:column;gap:10px}
+.otp-banner.show{display:flex}
+.otp-title{font-size:13px;font-weight:600;color:var(--amber);display:flex;align-items:center;gap:8px}
+.otp-body{font-size:12px;color:var(--amber);opacity:0.8;line-height:1.6}
+.otp-actions{display:flex;gap:8px}
+
+/* VIN grid */
+.vin-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:6px;max-height:160px;overflow-y:auto}
+.vin-card{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:7px 10px;font-family:var(--mono);font-size:11px;color:var(--text3);display:flex;align-items:center;gap:6px;transition:all 0.2s;white-space:nowrap;overflow:hidden}
+.vin-card.active{background:var(--accent-glow);border-color:var(--accent);color:var(--accent)}
+.vin-card.done{background:var(--green-dim);border-color:var(--green);color:var(--green)}
+.vin-card.failed{background:var(--red-dim);border-color:var(--red);color:var(--red)}
+.vin-dot{width:6px;height:6px;border-radius:50%;background:currentColor;flex-shrink:0}
+.vin-text{overflow:hidden;text-overflow:ellipsis}
+
+/* Progress bar */
+.progress-wrap{background:var(--surface2);border-radius:99px;height:4px;overflow:hidden;margin-top:10px}
+.progress-bar{height:100%;background:var(--accent);border-radius:99px;transition:width 0.4s ease;width:0%}
+.progress-bar.green{background:var(--green)}
+
+/* Log */
+.log-wrap{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;height:200px;overflow-y:auto;font-family:var(--mono);font-size:12px;line-height:1.8}
+.log-line{display:flex;gap:10px}
+.log-time{color:var(--text3);flex-shrink:0}
+.log-ok{color:var(--green)}
+.log-error{color:var(--red)}
+.log-warn{color:var(--amber)}
+.log-info{color:var(--accent)}
+.log-step{color:var(--text3);font-style:italic}
+
+/* Action row */
+.action-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+
+/* Empty state */
+.empty-vins{font-size:12px;color:var(--text3);font-family:var(--mono);padding:1rem 0;text-align:center}
+
+/* Responsive */
+@media(max-width:760px){
+  .shell{grid-template-columns:1fr;padding:0 1rem}
+  .sidebar{border-right:none;border-bottom:1px solid var(--border);padding:1.5rem 0;flex-direction:row;flex-wrap:wrap;gap:1rem}
+  .steps-nav{display:none}
+  .main{padding:1.5rem 0}
+  .creds-grid{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- ── Sidebar ── -->
+  <aside class="sidebar">
+    <div>
+      <div class="brand">
+        <div class="brand-icon">
+          <svg viewBox="0 0 20 20"><path d="M3 3h6v6H3zm8 0h6v6h-6zM3 11h6v6H3zm8 2l3-3 3 3-3 3z"/></svg>
+        </div>
+        <div>
+          <div class="brand-name">DMS Uploader</div>
+          <div class="brand-sub">spyne.ai · tekion</div>
+        </div>
+      </div>
+    </div>
+
+    <nav class="steps-nav">
+      <div class="steps-nav-title">Workflow</div>
+      <div class="step-item" id="nav1"><div class="step-num" id="nav1n">1</div><div class="step-label">Scan &amp; unzip VINs</div></div>
+      <div class="step-item" id="nav2"><div class="step-num" id="nav2n">2</div><div class="step-label">Login to DMS</div></div>
+      <div class="step-item" id="nav3"><div class="step-num" id="nav3n">3</div><div class="step-label">Enter OTP <span style="color:var(--amber);font-size:10px">manual</span></div></div>
+      <div class="step-item" id="nav4"><div class="step-num" id="nav4n">4</div><div class="step-label">Vehicle Inventory</div></div>
+      <div class="step-item" id="nav5"><div class="step-num" id="nav5n">5</div><div class="step-label">Search &amp; delete media</div></div>
+      <div class="step-item" id="nav6"><div class="step-num" id="nav6n">6</div><div class="step-label">Upload new images</div></div>
+      <div class="step-item" id="nav7"><div class="step-num" id="nav7n">7</div><div class="step-label">Save &amp; confirm</div></div>
+    </nav>
+
+    <div class="stats-mini">
+      <div class="stat-row-mini"><span class="stat-lbl-mini">total</span><span class="stat-val-mini amber" id="sTotal">—</span></div>
+      <div class="stat-row-mini"><span class="stat-lbl-mini">done</span><span class="stat-val-mini green" id="sDone">—</span></div>
+      <div class="stat-row-mini"><span class="stat-lbl-mini">failed</span><span class="stat-val-mini red" id="sFailed">—</span></div>
+    </div>
+  </aside>
+
+  <!-- ── Main ── -->
+  <main class="main">
+
+    <div class="main-header">
+      <div>
+        <div class="main-title">Vehicle Media <span>Upload</span></div>
+        <div style="font-size:12px;color:var(--text3);margin-top:4px;font-family:var(--mono)">tekion cloud · automated pipeline</div>
+      </div>
+      <div class="status-badge" id="statusBadge">
+        <div class="dot"></div>
+        <span id="statusText">idle</span>
+      </div>
+    </div>
+
+    <!-- Config card -->
+    <div class="card" id="configCard">
+      <div class="card-title">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M2 3a1 1 0 011-1h10a1 1 0 011 1v1H2V3zm0 3h12v8a1 1 0 01-1 1H3a1 1 0 01-1-1V6z"/></svg>
+        Source folder
+      </div>
+      <div class="form-group">
+        <div class="form-label">Local folder path — containing zipped VINs</div>
+        <div class="folder-row">
+          <input class="folder-input" id="folderInput" type="text"
+            placeholder="e.g.  C:\Users\Praveen\Desktop\VINs   or   /Users/praveen/Desktop/VINs"/>
+        </div>
+        <div style="font-size:11px;color:var(--text3);font-family:var(--mono)">
+          Zips will be extracted in-place and originals deleted. Plain VIN folders also supported.
+        </div>
+      </div>
+
+      <div class="card-title" style="margin-top:1.25rem">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a3 3 0 00-3 3v1H3.5A1.5 1.5 0 002 6.5v7A1.5 1.5 0 003.5 15h9a1.5 1.5 0 001.5-1.5v-7A1.5 1.5 0 0012.5 5H11V4a3 3 0 00-3-3zm0 1.5a1.5 1.5 0 011.5 1.5v1h-3V4A1.5 1.5 0 018 2.5z"/></svg>
+        DMS credentials
+      </div>
+      <div class="creds-grid">
+        <div class="form-group">
+          <div class="form-label">URL</div>
+          <div class="readonly-field">https://app.tekioncloud.com/</div>
+        </div>
+        <div class="form-group">
+          <div class="form-label">Username</div>
+          <div class="readonly-field">catalogue@spyne.ai</div>
+        </div>
+        <div class="form-group" style="grid-column:1/-1">
+          <div class="form-label">Password</div>
+          <div class="readonly-field" style="letter-spacing:0.2em">••••••••••</div>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--text3);font-family:var(--mono);margin-top:4px">
+        OTP is entered manually — automation pauses and waits at that step.
+      </div>
+    </div>
+
+    <!-- OTP Banner -->
+    <div class="otp-banner" id="otpBanner">
+      <div class="otp-title">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a3 3 0 00-3 3v1H3.5A1.5 1.5 0 002 6.5v7A1.5 1.5 0 003.5 15h9a1.5 1.5 0 001.5-1.5v-7A1.5 1.5 0 0012.5 5H11V4a3 3 0 00-3-3zm0 1.5a1.5 1.5 0 011.5 1.5v1h-3V4A1.5 1.5 0 018 2.5zM8 9a1 1 0 011 1v1.5a1 1 0 01-2 0V10a1 1 0 011-1z"/></svg>
+        Action required — enter OTP in browser
+      </div>
+      <div class="otp-body">
+        The browser window is waiting at the OTP screen. Please switch to it, enter the OTP, and once you're logged in click the button below.
+      </div>
+      <div class="otp-actions">
+        <button class="btn btn-success" onclick="otpDone()">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><path d="M12 3L6 10 2 6.5"/><path d="M12 3L6 10 2 6.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          OTP entered — continue
+        </button>
+      </div>
+    </div>
+
+    <!-- Manual nav banner (reused for nav step) -->
+    <div class="otp-banner" id="navBanner">
+      <div class="otp-title" style="color:var(--accent)">
+        Action required — navigate manually
+      </div>
+      <div class="otp-body" style="color:var(--accent)">
+        Auto-navigation to Vehicle Inventory failed. Please click the 9-dot menu → Vehicle Inventory in the browser, then click Resume.
+      </div>
+      <div class="otp-actions">
+        <button class="btn btn-success" onclick="otpDone()">Resume automation</button>
+      </div>
+    </div>
+
+    <!-- VIN Progress -->
+    <div class="card" id="vinCard" style="display:none">
+      <div class="card-title">VIN queue</div>
+      <div class="vin-grid" id="vinGrid">
+        <div class="empty-vins">No VINs loaded yet</div>
+      </div>
+      <div class="progress-wrap">
+        <div class="progress-bar" id="progressBar"></div>
+      </div>
+    </div>
+
+    <!-- Log -->
+    <div class="card" id="logCard" style="display:none">
+      <div class="card-title" style="justify-content:space-between">
+        <span>Activity log</span>
+        <button class="btn" style="padding:3px 10px;font-size:11px" onclick="document.getElementById('logBox').innerHTML=''">clear</button>
+      </div>
+      <div class="log-wrap" id="logBox"></div>
+    </div>
+
+    <!-- Action row -->
+    <div class="action-row">
+      <button class="btn btn-primary" id="runBtn" onclick="startRun()">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><path d="M3 2l9 5-9 5z"/></svg>
+        Start automation
+      </button>
+      <button class="btn btn-danger" id="stopBtn" style="display:none" onclick="stopRun()">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><rect x="2" y="2" width="10" height="10" rx="1"/></svg>
+        Stop
+      </button>
+      <button class="btn" id="resetBtn" style="display:none" onclick="resetRun()">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 7a5 5 0 1010 0 5 5 0 00-10 0"/><path d="M2 3v4h4"/></svg>
+        Reset
+      </button>
+    </div>
+
+  </main>
+</div>
+
+<script>
+const API = 'http://localhost:7432';
+let polling = null;
+let lastLogLen = 0;
+let prevStatus = 'idle';
+
+// ── Poll ──────────────────────────────────────────────────────────────────────
+function startPolling() {
+  if (polling) return;
+  polling = setInterval(fetchState, 1000);
+}
+function stopPolling() {
+  clearInterval(polling); polling = null;
+}
+
+async function fetchState() {
+  try {
+    const r = await fetch(API + '/state');
+    const s = await r.json();
+    applyState(s);
+  } catch(e) {
+    // server not yet ready
+  }
+}
+
+// ── Apply state ───────────────────────────────────────────────────────────────
+function applyState(s) {
+  // Status badge
+  const badge = document.getElementById('statusBadge');
+  const dot = badge.querySelector('.dot');
+  const txt = document.getElementById('statusText');
+  badge.className = 'status-badge ' + s.status;
+  dot.className = 'dot' + (s.status === 'running' || s.status === 'otp_wait' ? ' pulse' : '');
+  const labels = {idle:'idle',running:'running…',otp_wait:'waiting for OTP',done:'completed',error:'error',stopped:'stopped'};
+  txt.textContent = labels[s.status] || s.status;
+
+  // Step nav
+  for (let i = 1; i <= 7; i++) {
+    const item = document.getElementById('nav'+i);
+    const num = document.getElementById('nav'+i+'n');
+    item.className = 'step-item';
+    if (s.step === i) { item.className += ' active'; }
+    else if (s.step > i) { item.className += ' done'; num.textContent = '✓'; }
+    else if (s.step === i && s.status === 'otp_wait') { item.className += ' waiting'; }
+    if (s.step !== i && s.step <= i) num.textContent = i;
+  }
+
+  // Stats
+  document.getElementById('sTotal').textContent = s.total || '—';
+  document.getElementById('sDone').textContent = s.done_vins?.length ?? '—';
+  document.getElementById('sFailed').textContent = s.failed_vins?.length ?? '—';
+
+  // OTP banner
+  const otpB = document.getElementById('otpBanner');
+  const navB = document.getElementById('navBanner');
+  if (s.status === 'otp_wait' && s.step === 3) {
+    otpB.classList.add('show'); navB.classList.remove('show');
+  } else if (s.status === 'otp_wait' && s.step === 4) {
+    navB.classList.add('show'); otpB.classList.remove('show');
+  } else {
+    otpB.classList.remove('show'); navB.classList.remove('show');
+  }
+
+  // VINs
+  if (s.vins && s.vins.length) {
+    document.getElementById('vinCard').style.display = 'block';
+    renderVins(s.vins, s.current_vin, s.done_vins, s.failed_vins);
+    const pct = s.total > 0 ? (s.done_vins.length / s.total) * 100 : 0;
+    const bar = document.getElementById('progressBar');
+    bar.style.width = pct + '%';
+    bar.className = 'progress-bar' + (pct >= 100 ? ' green' : '');
+  }
+
+  // Log
+  if (s.log && s.log.length > lastLogLen) {
+    const box = document.getElementById('logBox');
+    document.getElementById('logCard').style.display = 'block';
+    for (let i = lastLogLen; i < s.log.length; i++) {
+      const l = s.log[i];
+      const cls = l.kind === 'ok' ? 'log-ok' : l.kind === 'error' ? 'log-error' : l.kind === 'warn' ? 'log-warn' : l.kind === 'info' ? 'log-info' : 'log-step';
+      const icon = l.kind === 'ok' ? '✓' : l.kind === 'error' ? '✗' : l.kind === 'warn' ? '!' : l.kind === 'step' ? '›' : '→';
+      box.innerHTML += `<div class="log-line"><span class="log-time">${l.t}</span><span class="${cls}">${icon} ${escHtml(l.msg)}</span></div>`;
+    }
+    lastLogLen = s.log.length;
+    box.scrollTop = box.scrollHeight;
+  }
+
+  // Buttons
+  const isActive = s.status === 'running' || s.status === 'otp_wait';
+  const isDone = s.status === 'done' || s.status === 'error' || s.status === 'stopped';
+  document.getElementById('runBtn').style.display = isActive || isDone ? 'none' : 'inline-flex';
+  document.getElementById('stopBtn').style.display = isActive ? 'inline-flex' : 'none';
+  document.getElementById('resetBtn').style.display = isDone ? 'inline-flex' : 'none';
+
+  if (!isActive && isDone) stopPolling();
+}
+
+function renderVins(vins, current, done, failed) {
+  const grid = document.getElementById('vinGrid');
+  grid.innerHTML = vins.map(v => {
+    let cls = 'vin-card';
+    if (done && done.includes(v)) cls += ' done';
+    else if (failed && failed.includes(v)) cls += ' failed';
+    else if (v === current) cls += ' active';
+    return `<div class="${cls}" title="${v}"><div class="vin-dot"></div><div class="vin-text">${v}</div></div>`;
+  }).join('');
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── Actions ───────────────────────────────────────────────────────────────────
+async function startRun() {
+  const folder = document.getElementById('folderInput').value.trim();
+  if (!folder) { alert('Please enter the folder path first.'); return; }
+  lastLogLen = 0;
+  document.getElementById('logBox').innerHTML = '';
+  document.getElementById('logCard').style.display = 'none';
+  document.getElementById('vinCard').style.display = 'none';
+  try {
+    const r = await fetch(API + '/start', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({folder})
+    });
+    const d = await r.json();
+    if (!d.ok) { alert('Error: ' + d.error); return; }
+    startPolling();
+  } catch(e) {
+    alert('Cannot reach server. Make sure server.py is running.\n\n' + e);
+  }
+}
+
+async function stopRun() {
+  await fetch(API + '/stop').catch(()=>{});
+  stopPolling();
+  setTimeout(fetchState, 500);
+}
+
+async function otpDone() {
+  await fetch(API + '/otp_done').catch(()=>{});
+}
+
+async function resetRun() {
+  lastLogLen = 0;
+  await fetch(API + '/reset').catch(()=>{});
+  document.getElementById('logBox').innerHTML = '';
+  document.getElementById('logCard').style.display = 'none';
+  document.getElementById('vinCard').style.display = 'none';
+  document.getElementById('otpBanner').classList.remove('show');
+  document.getElementById('navBanner').classList.remove('show');
+  for (let i = 1; i <= 7; i++) {
+    const item = document.getElementById('nav'+i);
+    const num = document.getElementById('nav'+i+'n');
+    item.className = 'step-item';
+    num.textContent = i;
+  }
+  document.getElementById('statusBadge').className = 'status-badge';
+  document.getElementById('statusText').textContent = 'idle';
+  document.getElementById('sTotal').textContent = '—';
+  document.getElementById('sDone').textContent = '—';
+  document.getElementById('sFailed').textContent = '—';
+  document.getElementById('runBtn').style.display = 'inline-flex';
+  document.getElementById('stopBtn').style.display = 'none';
+  document.getElementById('resetBtn').style.display = 'none';
+}
+
+// Start polling immediately to sync if server already running
+startPolling();
+</script>
+</body>
+</html>

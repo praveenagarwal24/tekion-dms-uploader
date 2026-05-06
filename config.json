@@ -1,0 +1,8 @@
+{
+  "dms_url": "https://app.tekioncloud.com/",
+  "username": "catalogue@spyne.ai",
+  "password": "Spyne@123",
+  "port": 7432,
+  "image_extensions": [".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp"],
+  "save_retry_attempts": 8
+}
